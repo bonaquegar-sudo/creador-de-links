@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Enlaces de Reseñas de Google Maps | Extraer Place ID</title>
+    <meta name="description" content="Convierte cualquier enlace de Google Maps en un enlace directo para escribir reseñas de 5 estrellas con Place ID (ChIJ).">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="background-decorations">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+        <div class="grid-pattern"></div>
+    </div>
+
+    <header class="app-header">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2Z" fill="url(#pin-gradient)" />
+                    <circle cx="12" cy="9" r="3.2" fill="#ffffff" />
+                    <path d="M12 7.5L12.9 9.3L14.9 9.6L13.4 11.1L13.8 13.1L12 12.1L10.2 13.1L10.6 11.1L9.1 9.6L11.1 9.3L12 7.5Z" fill="#F4B400"/>
+                    <defs>
+                        <linearGradient id="pin-gradient" x1="5" y1="2" x2="19" y2="22" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#4285F4"/>
+                            <stop offset="0.5" stop-color="#EA4335"/>
+                            <stop offset="1" stop-color="#FBBC05"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div class="logo-text">
+                <span class="brand-title">Google Review Linker</span>
+                <span class="brand-badge">Place ID Converter</span>
+            </div>
+        </div>
+        <nav class="nav-links">
+            <button id="themeToggle" class="icon-btn" title="Cambiar tema">
+                <span class="theme-icon-sun">☀️</span>
+                <span class="theme-icon-moon">🌙</span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="main-container">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="badge-pill">
+                <span class="pulse-dot"></span>
+                <span>Optimizado para Tarjetas NFC y Códigos QR</span>
+            </div>
+            <h1>Generador de Enlaces de Reseñas de Google</h1>
+            <p class="hero-subtitle">
+                Pega la URL de Google Maps de cualquier negocio para extraer su <strong>Place ID</strong> y generar el enlace oficial de valoración:
+                <code>https://search.google.com/local/writereview?placeid=...</code>
+            </p>
+        </section>
+
+        <!-- Tool Card -->
+        <section class="converter-card">
+            <!-- Tabs Navigation -->
+            <div class="tabs-header">
+                <button class="tab-btn active" id="tabSingle" onclick="switchTab('single')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                    Conversor Principal
+                </button>
+                <button class="tab-btn" id="tabBatch" onclick="switchTab('batch')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Procesado por Lotes (Múltiples)
+                </button>
+            </div>
+
+            <!-- Single Tab Content -->
+            <div id="singlePanel" class="tab-panel active">
+                <form id="urlForm" onsubmit="event.preventDefault(); processInput();">
+                    <div class="input-group-wrapper">
+                        <label for="mapsInput" class="input-label">
+                            <span>Pega el enlace de Google Maps del negocio</span>
+                            <span class="label-hint">Ej: https://www.google.com/maps/place/... o ChIJ...</span>
+                        </label>
+                        <div class="input-container">
+                            <div class="input-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="mapsInput" 
+                                placeholder="Pega aquí la URL de Google Maps..." 
+                                autocomplete="off"
+                                spellcheck="false"
+                            />
+                            <div class="input-actions">
+                                <button type="button" id="pasteBtn" class="action-btn" title="Pegar del portapapeles">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                                    Pegar
+                                </button>
+                                <button type="button" id="clearBtn" class="action-btn hidden" title="Limpiar">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" id="generateBtn" class="primary-btn">
+                            <span class="btn-text">Generar Enlace de Reseña</span>
+                            <span class="btn-icon">⚡</span>
+                            <div class="btn-loader"></div>
+                        </button>
+                        <button type="button" id="sampleBtn" class="secondary-btn">
+                            Probar con ejemplo
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Status / Alert Message -->
+                <div id="statusMessage" class="status-box hidden"></div>
+
+                <!-- Result Card -->
+                <div id="resultCard" class="result-card hidden">
+                    <div class="result-header">
+                        <div class="status-indicator">
+                            <span class="dot-success"></span>
+                            <span class="status-text">¡Place ID Extraído y Enlace Generado!</span>
+                        </div>
+                        <div class="id-type-badge" id="idTypeBadge">Place ID (ChIJ)</div>
+                    </div>
+
+                    <!-- Main Output URL (https://search.google.com/local/writereview?placeid=...) -->
+                    <div class="output-box-wrapper">
+                        <label class="output-label">Enlace Directo de Reseñas de Google:</label>
+                        <div class="output-box highlight-box">
+                            <input type="text" id="finalReviewUrl" readonly />
+                            <div class="output-actions">
+                                <button id="copyReviewBtn" class="copy-btn" onclick="copyToClipboard('finalReviewUrl', this)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    <span>Copiar</span>
+                                </button>
+                                <a id="testReviewBtn" href="#" target="_blank" rel="noopener noreferrer" class="test-btn" title="Abrir y verificar">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                    <span>Abrir Enlace</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Extracted Details Grid -->
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Establecimiento / Negocio:</span>
+                            <div class="detail-value-wrapper">
+                                <strong id="extractedBusinessName" class="business-name-badge">-</strong>
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Google Place ID (ChIJ):</span>
+                            <div class="detail-value-wrapper">
+                                <code id="extractedId" class="code-badge">-</code>
+                                <button class="mini-copy-btn" onclick="copyText(document.getElementById('extractedId').innerText, this)" title="Copiar Place ID">📋</button>
+                            </div>
+                        </div>
+                        <div class="detail-item" id="cidItemRow">
+                            <span class="detail-label">Google CID (Decimal):</span>
+                            <div class="detail-value-wrapper">
+                                <code id="extractedCid" class="code-badge">-</code>
+                                <button class="mini-copy-btn" onclick="copyText(document.getElementById('extractedCid').innerText, this)" title="Copiar CID">📋</button>
+                            </div>
+                        </div>
+                        <div class="detail-item" id="altUrlItemRow">
+                            <span class="detail-label">Enlace CID Maps:</span>
+                            <div class="detail-value-wrapper">
+                                <input type="text" id="altReviewUrl" class="mini-input" readonly value="-" />
+                                <button class="mini-copy-btn" onclick="copyToClipboard('altReviewUrl', this)" title="Copiar Enlace CID">📋</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR Code & NFC Section -->
+                    <div class="qr-and-tools">
+                        <div class="qr-preview-box">
+                            <div class="qr-frame" id="qrcodeCanvas"></div>
+                            <div class="qr-meta">
+                                <h4>Código QR para Tarjetas NFC o Cartelería</h4>
+                                <p>Apunta al enlace directo generado para que tus clientes califiquen tu negocio al instante.</p>
+                                <div class="qr-actions">
+                                    <button class="small-btn" onclick="downloadQRCode('png')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                        Descargar QR (PNG)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Batch Tab Content -->
+            <div id="batchPanel" class="tab-panel">
+                <div class="batch-intro">
+                    <p>Pega múltiples URLs de Google Maps (una por línea) para procesarlas todas a la vez:</p>
+                </div>
+                <textarea id="batchInput" class="batch-textarea" placeholder="https://www.google.com/maps/place/...&#10;https://www.google.com/maps/place/..."></textarea>
+                <div class="form-actions">
+                    <button type="button" id="processBatchBtn" class="primary-btn" onclick="processBatch()">
+                        <span class="btn-text">Procesar Todos</span>
+                        <span class="btn-icon">⚙️</span>
+                    </button>
+                    <button type="button" class="secondary-btn" onclick="document.getElementById('batchInput').value = ''">
+                        Limpiar Lista
+                    </button>
+                </div>
+
+                <div id="batchResultsContainer" class="batch-results-container hidden">
+                    <div class="batch-results-header">
+                        <h3>Resultados Procesados (<span id="batchCount">0</span>)</h3>
+                        <button class="small-btn" onclick="exportBatchCSV()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Exportar a CSV
+                        </button>
+                    </div>
+                    <div class="batch-table-wrapper">
+                        <table class="batch-table" id="batchTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Tipo</th>
+                                    <th>Enlace Directo Generado</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batchTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instructions & Educational Section -->
+        <section class="info-section">
+            <h2 class="section-title">¿Cómo funciona?</h2>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon blue">1</div>
+                    <h3>Busca el negocio en Google Maps</h3>
+                    <p>Abre Google Maps y busca el establecimiento comercial.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon red">2</div>
+                    <h3>Copia la URL</h3>
+                    <p>Copia la URL de la barra de direcciones del navegador con la ficha del negocio abierta.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon green">3</div>
+                    <h3>Conversión Automática a Place ID</h3>
+                    <p>La herramienta convierte matemáticamente los identificadores internos en el <strong>Place ID (<code>ChIJ...</code>)</strong> oficial y genera la URL <code>/local/writereview?placeid=...</code>.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- History Section -->
+        <section id="historySection" class="history-section hidden">
+            <div class="history-header">
+                <h3>Historial Reciente</h3>
+                <button class="link-btn" onclick="clearHistory()">Borrar Historial</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <p>Google Review Link Generator &bull; Diseñado para tarjetas NFC de reseñas y marketing local.</p>
+        <p class="disclaimer">Google y Google Maps son marcas registradas de Google LLC. Esta herramienta no está afiliada con Google.</p>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="toast hidden">
+        <span id="toastIcon">✓</span>
+        <span id="toastMsg">Enlace copiado al portapapeles</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
