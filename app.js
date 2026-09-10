@@ -12,6 +12,10 @@ const STORAGE_KEY_HISTORY = 'gm_reviewer_history';
 // Sample URLs for quick testing
 const SAMPLES = [
     {
+        url: "https://maps.app.goo.gl/KpgErZfHSTVbuHfX8",
+        label: "Lelato (Enlace móvil maps.app.goo.gl)"
+    },
+    {
         url: "https://www.google.com/maps/place/Catedral+de+la+Encarnaci%C3%B3n+de+M%C3%A1laga/@36.7201738,-4.4222485,17z/data=!4m6!3m5!1s0xd72f7bf2805efb1:0x84c2f1618a8f15d7!8m2!3d36.7201738!4d-4.4196736!16zL20vMDY1ODk1?entry=ttu",
         label: "Catedral de Málaga (Google Maps URL)"
     },
@@ -166,9 +170,146 @@ function convertHexToPlaceId(hex1Str, hex2Str) {
 /* ==========================================================================
    Place ID & CID Extraction Core Logic
    ========================================================================== */
+
+/**
+ * Unwraps Google Maps URLs that may be wrapped inside consent, redirect, or search params
+ * (e.g. consent.google.com/ml?continue=... or google.com/url?q=...)
+ */
+function unwrapGoogleUrl(url) {
+    if (!url || typeof url !== 'string') return url;
+    try {
+        let current = url.trim();
+        if (current.includes('continue=') || current.includes('url=') || current.includes('q=')) {
+            const parsed = new URL(current.startsWith('http') ? current : 'https://' + current);
+            const target = parsed.searchParams.get('continue') || parsed.searchParams.get('url') || parsed.searchParams.get('q');
+            if (target && (target.includes('google.com/maps') || target.includes('!1s0x') || target.includes('/place/'))) {
+                current = decodeURIComponent(target);
+            }
+        }
+        return current;
+    } catch (e) {
+        return url;
+    }
+}
+
+/**
+ * Detects if a URL is a Google Maps shortened link from mobile or share features
+ * (maps.app.goo.gl, goo.gl/maps, g.co/kgs, etc.)
+ */
+function isShortGoogleMapsUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const clean = url.trim();
+    return /maps\.app\.goo\.gl\/[a-zA-Z0-9_-]+/i.test(clean) ||
+           /goo\.gl\/maps\/[a-zA-Z0-9_-]+/i.test(clean) ||
+           /g\.co\/kgs\/[a-zA-Z0-9_-]+/i.test(clean) ||
+           /page\.link\/[a-zA-Z0-9_-]+/i.test(clean);
+}
+
+/**
+ * Asynchronously unshortens maps.app.goo.gl or other shortlinks to extract the full place data
+ */
+async function resolveShortUrl(shortUrl) {
+    if (!shortUrl) return null;
+    let target = shortUrl.trim();
+    if (!target.startsWith('http://') && !target.startsWith('https://')) {
+        target = 'https://' + target;
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+        const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(target)}`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && data.resolved_url) {
+                const unwrapped = unwrapGoogleUrl(data.resolved_url);
+                const extracted = extractGoogleMapsId(unwrapped);
+                if (extracted) {
+                    return extracted;
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("No se pudo expandir el enlace corto automáticamente:", err);
+    }
+
+    return null;
+}
+
+/**
+ * Renders an interactive helper card if a short link cannot be resolved in background (e.g. adblocker)
+ */
+function showShortLinkHelper(shortUrl) {
+    const statusBox = document.getElementById('statusMessage');
+    if (!statusBox) return;
+
+    let targetUrl = shortUrl.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = 'https://' + targetUrl;
+    }
+
+    statusBox.className = 'status-box warning shortlink-box';
+    statusBox.innerHTML = `
+        <div class="shortlink-helper-container">
+            <div class="shortlink-helper-title">
+                <span>📱</span>
+                <strong>Enlace corto móvil detectado (<code>maps.app.goo.gl</code>)</strong>
+            </div>
+            <p class="shortlink-helper-desc">
+                Google protege estos enlaces acortados para que solo se abran en su aplicación o navegador.
+                Para obtener el Place ID oficial en 2 segundos:
+            </p>
+            <div class="shortlink-helper-steps">
+                <div class="shortlink-step">
+                    <span class="step-badge">Paso 1</span>
+                    <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="action-btn-highlight">
+                        Abrir ficha en Google Maps ↗
+                    </a>
+                </div>
+                <div class="shortlink-step">
+                    <span class="step-badge">Paso 2</span>
+                    <span>Copia la dirección completa de la barra del navegador y haz clic aquí:</span>
+                    <button type="button" class="action-btn-highlight secondary" onclick="handlePasteExpandedUrl()">
+                        📋 Pegar enlace copiado
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    statusBox.classList.remove('hidden');
+}
+
+async function handlePasteExpandedUrl() {
+    const mapsInput = document.getElementById('mapsInput');
+    const clearBtn = document.getElementById('clearBtn');
+    try {
+        const text = await navigator.clipboard.readText();
+        if (text && mapsInput) {
+            mapsInput.value = text.trim();
+            if (clearBtn) clearBtn.classList.remove('hidden');
+            processInput();
+        }
+    } catch (err) {
+        showToast("Pega el enlace manualmente en la casilla (Ctrl+V)", true);
+    }
+}
+
+function showLoadingStatus(msg) {
+    const statusBox = document.getElementById('statusMessage');
+    if (!statusBox) return;
+    statusBox.className = 'status-box info';
+    statusBox.innerHTML = `<div class="status-loading-spinner"></div> <span>${msg}</span>`;
+    statusBox.classList.remove('hidden');
+}
+
 function extractGoogleMapsId(input) {
     if (!input || typeof input !== 'string') return null;
-    input = input.trim();
+    input = unwrapGoogleUrl(input.trim());
 
     // Extract Business Name from URL if present
     let businessName = null;
@@ -311,6 +452,7 @@ function extractGoogleMapsId(input) {
    ========================================================================== */
 async function processInput(isLive = false) {
     const inputEl = document.getElementById('mapsInput');
+    const generateBtn = document.getElementById('generateBtn');
     if (!inputEl) return;
 
     let input = inputEl.value.trim();
@@ -320,6 +462,36 @@ async function processInput(isLive = false) {
     }
 
     hideStatus();
+
+    // Check if it's a short URL (maps.app.goo.gl, etc.)
+    if (isShortGoogleMapsUrl(input)) {
+        // If live typing, ensure there's enough token (e.g. at least 6 chars after domain)
+        const parts = input.split('/');
+        if (isLive && parts[parts.length - 1].length < 6) {
+            return;
+        }
+
+        if (generateBtn) generateBtn.classList.add('loading');
+        showLoadingStatus("Resolviendo enlace móvil maps.app.goo.gl...");
+
+        const extracted = await resolveShortUrl(input);
+
+        if (generateBtn) generateBtn.classList.remove('loading');
+        hideStatus();
+
+        if (extracted) {
+            displayResult(extracted, input);
+            saveToHistory(extracted, input);
+            if (!isLive) {
+                showToast("¡Enlace móvil resuelto y reseña generada!");
+            }
+            return;
+        } else {
+            hideResult();
+            showShortLinkHelper(input);
+            return;
+        }
+    }
 
     // Standard extraction
     const extracted = extractGoogleMapsId(input);
@@ -472,8 +644,9 @@ function switchTab(tab) {
 
 let batchDataStore = [];
 
-function processBatch() {
+async function processBatch() {
     const batchInput = document.getElementById('batchInput');
+    const processBatchBtn = document.getElementById('processBatchBtn');
     if (!batchInput) return;
 
     const lines = batchInput.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -489,8 +662,21 @@ function processBatch() {
     tableBody.innerHTML = '';
     batchDataStore = [];
 
-    lines.forEach((line, index) => {
-        const extracted = extractGoogleMapsId(line);
+    if (processBatchBtn) {
+        processBatchBtn.disabled = true;
+        processBatchBtn.classList.add('loading');
+    }
+
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
+        let extracted = null;
+
+        if (isShortGoogleMapsUrl(line)) {
+            extracted = await resolveShortUrl(line);
+        } else {
+            extracted = extractGoogleMapsId(line);
+        }
+
         const finalUrl = (extracted && extracted.reviewUrl) ? extracted.reviewUrl : '-';
         const type = (extracted && extracted.type) ? extracted.type : 'Inválido';
 
@@ -514,7 +700,12 @@ function processBatch() {
             </td>
         `;
         tableBody.appendChild(tr);
-    });
+    }
+
+    if (processBatchBtn) {
+        processBatchBtn.disabled = false;
+        processBatchBtn.classList.remove('loading');
+    }
 
     countEl.innerText = batchDataStore.length;
     container.classList.remove('hidden');
